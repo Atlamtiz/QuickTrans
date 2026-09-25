@@ -1,0 +1,10 @@
+# SwiftPM 编译产物
+.build/
+.swiftpm/
+Package.resolved
+
+# scripts/build.sh 的打包产物
+build/
+
+# macOS
+.DS_Store
