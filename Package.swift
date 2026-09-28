@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "QuickTrans",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("15.0")],
     targets: [
         .executableTarget(
             name: "QuickTrans",

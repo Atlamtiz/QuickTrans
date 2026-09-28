@@ -183,6 +183,7 @@ private struct APISettingsTab: View {
     @AppStorage(Keys.apiKey) private var apiKey = ""
     @AppStorage(Keys.model) private var model = Defaults.model
     @AppStorage(Keys.disableThinking) private var disableThinking = true
+    @AppStorage(Keys.engineMode) private var engineMode = EngineMode.auto.rawValue
     @State private var revealKey = false
     @State private var testing = false
     @State private var testResult: String?
@@ -190,6 +191,20 @@ private struct APISettingsTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("使用", selection: $engineMode) {
+                    ForEach(EngineMode.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .pickerStyle(.radioGroup)
+                OfflineLanguageRow()
+            } header: {
+                Text("翻译引擎")
+            } footer: {
+                Text("自动：有网时用下面配置的在线接口；没网、没填 Key、在线 \(Int(EngineMode.autoFallbackTimeout)) 秒没有响应或出错时，改用系统自带的离线翻译，译文区角落会注明原因。离线翻译免费、不联网，但质量不如大模型，也不区分正常 / 学术。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 TextField("接口地址", text: $baseURL, prompt: Text(Defaults.baseURL))
                 LabeledContent("API Key") {

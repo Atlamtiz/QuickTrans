@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
     private var appliedDarkAppearance: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NetworkMonitor.shared.start()
         buildMenu()
         showMainWindow()
         NotificationCenter.default.addObserver(
@@ -39,8 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
         return true
     }
 
-    /// 取词后：填入原文、开始翻译，并把主窗口带到最前面（位置保持你上次放的地方）。
+    /// 取词后：把主窗口带到最前面（位置保持你上次放的地方），填入原文、开始翻译。
+    /// 先显示窗口再翻译：离线翻译的会话挂在主窗口上。
     private func handleCapture(_ result: CaptureResult) {
+        showMainWindow()
         switch result {
         case .text(let raw):
             let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -56,7 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
         case .needsPermission:
             model.showNotice("需要先在「系统设置 → 隐私与安全性 → 辅助功能」中打开 QuickTrans。")
         }
-        showMainWindow()
     }
 
     // MARK: - 窗口

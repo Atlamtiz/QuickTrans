@@ -14,6 +14,53 @@ enum Direction: String, CaseIterable, Identifiable {
     }
 }
 
+extension Direction {
+    /// 自动判断方向：以中文为主就译成英文，否则译成中文。
+    /// 汉字个数和英文单词个数比：中文句子里夹几个英文术语（写论文时最常见）仍算中文。
+    static func detect(_ text: String) -> Direction {
+        var han = 0
+        var latinWords = 0
+        var inWord = false
+        for scalar in text.unicodeScalars {
+            let isLatin = (0x41...0x5A).contains(scalar.value) || (0x61...0x7A).contains(scalar.value)
+            if isLatin, !inWord { latinWords += 1 }
+            inWord = isLatin
+            if (0x4E00...0x9FFF).contains(scalar.value) || (0x3400...0x4DBF).contains(scalar.value) { han += 1 }
+        }
+        return han > 0 && han >= latinWords ? .toEnglish : .toChinese
+    }
+
+    var arrow: String {
+        switch self {
+        case .toEnglish: return "中→英"
+        case .toChinese: return "英→中"
+        }
+    }
+}
+
+/// 顶栏的方向选择：自动判断，或手动指定输出语言（原文中英混杂、自动判断不合意时用）。
+enum DirectionChoice: String, CaseIterable, Identifiable {
+    case auto, toEnglish, toChinese
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: return "自动"
+        case .toEnglish: return "译成英文"
+        case .toChinese: return "译成中文"
+        }
+    }
+
+    func resolve(for text: String) -> Direction {
+        switch self {
+        case .auto: return Direction.detect(text)
+        case .toEnglish: return .toEnglish
+        case .toChinese: return .toChinese
+        }
+    }
+}
+
 enum Style: String, CaseIterable, Identifiable {
     case normal, academic
 
@@ -29,6 +76,31 @@ enum Style: String, CaseIterable, Identifiable {
 
 enum HotkeyMode: String {
     case doubleCmdC, custom
+}
+
+/// 用哪个翻译引擎。
+enum EngineMode: String, CaseIterable, Identifiable {
+    /// 有网先用 DeepSeek；没网、没填 Key、10 秒无响应或出错时改用离线翻译。
+    case auto
+    case online
+    case offline
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: return "自动（推荐）"
+        case .online: return "只用在线（DeepSeek 等大模型）"
+        case .offline: return "只用离线（系统自带翻译）"
+        }
+    }
+
+    static var current: EngineMode {
+        EngineMode(rawValue: UserDefaults.standard.string(forKey: Keys.engineMode) ?? "") ?? .auto
+    }
+
+    /// 自动模式下，等在线结果最多等多久（收不到任何数据就换离线）。
+    static let autoFallbackTimeout: Double = 10
 }
 
 /// UserDefaults 的键。
@@ -47,6 +119,7 @@ enum Keys {
     static let fontLatin = "fontLatin"
     static let fontCJK = "fontCJK"
     static let fontSize = "fontSize"
+    static let engineMode = "engineMode"
 
     static func prompt(_ direction: Direction, _ style: Style) -> String {
         "prompt.\(direction.rawValue).\(style.rawValue)"
@@ -65,7 +138,7 @@ enum Defaults {
             Keys.apiKey: "",
             Keys.model: model,
             Keys.disableThinking: true,
-            Keys.direction: Direction.toEnglish.rawValue,
+            Keys.direction: DirectionChoice.auto.rawValue,
             Keys.style: Style.normal.rawValue,
             Keys.hotkeyMode: HotkeyMode.doubleCmdC.rawValue,
             Keys.customDisplay: "",
@@ -73,6 +146,7 @@ enum Defaults {
             Keys.fontLatin: "",
             Keys.fontCJK: "",
             Keys.fontSize: fontSize,
+            Keys.engineMode: EngineMode.auto.rawValue,
         ]
         for direction in Direction.allCases {
             for style in Style.allCases {

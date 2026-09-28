@@ -52,7 +52,7 @@ enum TranslationError: LocalizedError {
             switch code {
             case 401: hint = "API Key 无效，请在设置里检查。"
             case 402: hint = "账户余额不足。"
-            case 404: hint = "接口地址或模型名不对，请在设置里检查。"
+            case 400, 404, 422: hint = "接口地址或模型名不对，请在设置里检查。"
             case 429: hint = "请求太频繁，请稍后再试。"
             case 500...599: hint = "服务端暂时出错，请稍后重试。"
             default: hint = ""
@@ -152,6 +152,36 @@ enum TranslationService {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// 自动换成离线翻译时，提示里用的简短原因。
+    static func shortReason(_ error: Error) -> String {
+        if let error = error as? TranslationError {
+            switch error {
+            case .missingKey: return "没有填 API Key"
+            case .badURL: return "接口地址无效"
+            case .http(401, _): return "API Key 无效"
+            case .http(402, _): return "余额不足"
+            case .http(429, _): return "请求太频繁"
+            case .http(400, _), .http(404, _), .http(422, _): return "接口地址或模型名不对"
+            case .http(500...599, _): return "服务或代理出错"
+            case .http(let code, _): return "服务出错 \(code)"
+            case .server: return "服务端出错"
+            case .incomplete("insufficient_system_resource"): return "服务繁忙"
+            case .incomplete("content_filter"): return "内容被过滤"
+            case .incomplete: return "输出不完整"
+            case .noResponse: return "没有响应"
+            }
+        }
+        if let error = error as? URLError {
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost: return "网络断开"
+            case .timedOut: return "请求超时"
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "连不上服务"
+            default: return "网络出错"
+            }
+        }
+        return "在线翻译出错"
     }
 
     /// 给用户看的错误说明。

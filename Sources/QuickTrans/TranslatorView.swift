@@ -17,6 +17,7 @@ struct MainView: View {
                 TranslatorPanes(model: model, theme: theme)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(OfflineTranslationHost())
             .background(alignment: .top) {
                 // 窗口顶部的安全区就是工具栏的高度，把顶栏背景往上挪进去。
                 VStack(spacing: 0) {
@@ -38,14 +39,19 @@ struct MainView: View {
 struct HeaderControls: View {
     @ObservedObject var model: TranslatorModel
     @AppStorage(Keys.theme) private var themeID = Theme.defaultID
+    @AppStorage(Keys.engineMode) private var engineMode = EngineMode.auto.rawValue
 
     var body: some View {
         let theme = Theme.named(themeID)
         HStack(spacing: 14) {
-            ThemedSegmented(options: Direction.allCases, label: \.label, selection: $model.direction, theme: theme)
-                .help("选择输出语言")
+            ThemedSegmented(options: DirectionChoice.allCases, label: \.label, selection: $model.directionChoice, theme: theme)
+                .help("自动：按原文以中文还是英文为主判断方向；也可以手动指定输出语言")
+            // 离线翻译没有提示词，不区分正常 / 学术。
+            let offlineOnly = engineMode == EngineMode.offline.rawValue
             ThemedSegmented(options: Style.allCases, label: \.label, selection: $model.style, theme: theme)
-                .help("正常 / 学术")
+                .disabled(offlineOnly)
+                .opacity(offlineOnly ? 0.45 : 1)
+                .help(offlineOnly ? "离线翻译不区分正常 / 学术" : "正常 / 学术")
         }
         .fixedSize()
     }
@@ -242,6 +248,21 @@ struct TranslatorPanes: View {
         HStack(spacing: 12) {
             if model.isTranslating {
                 ProgressView().controlSize(.small)
+            }
+            if model.directionChoice == .auto, let direction = model.activeDirection {
+                Text("自动 · \(direction.arrow)")
+                    .font(.caption)
+                    .foregroundStyle(theme.secondaryText)
+                    .help("按原文以中文还是英文为主自动判断；不合意可在顶部手动选「译成英文 / 译成中文」")
+            }
+            if let engineNote = model.engineNote {
+                Text(engineNote)
+                    .font(.caption)
+                    .foregroundStyle(model.engineFellBack ? theme.notice : theme.secondaryText)
+                    .lineLimit(1)
+                    .help(model.engineFellBack
+                          ? "自动模式：在线翻译不可用，这次用了系统自带的离线翻译。\n原因：\(model.engineDetail ?? "-")"
+                          : "这次用的翻译引擎")
             }
             if let notice = model.notice {
                 Text(notice)
