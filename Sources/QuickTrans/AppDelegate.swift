@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var appliedDarkAppearance: Bool?
+    private var imagePasteMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NetworkMonitor.shared.start()
@@ -21,6 +22,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyThemeAppearance() }
+        }
+        // 在翻译窗口里按 ⌘V 且剪贴板是图片（截图）时，不管焦点在哪，都识别图片里的文字。
+        // 剪贴板是文字时照常放行；设置窗口不受影响。按住不放的重复按键直接吞掉，免得一次发起一堆识别。
+        imagePasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, let window = self.mainWindow, event.window === window,
+                  event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command,
+                  event.charactersIgnoringModifiers?.lowercased() == "v",
+                  ImageText.containsImage(.general) else { return event }
+            if !event.isARepeat {
+                self.model.recognizeImages(ImageText.images(from: .general))
+            }
+            return nil
         }
         HotkeyManager.shared.onTrigger = { [weak self] result in
             self?.handleCapture(result)
@@ -44,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
     /// 先显示窗口再翻译：离线翻译的会话挂在主窗口上。
     private func handleCapture(_ result: CaptureResult) {
         showMainWindow()
+        model.cancelRecognition()
         switch result {
         case .text(let raw):
             let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)

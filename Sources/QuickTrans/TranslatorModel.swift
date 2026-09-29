@@ -11,6 +11,8 @@ final class TranslatorModel: ObservableObject {
     }
     @Published private(set) var target = ""
     @Published private(set) var isTranslating = false
+    /// 正在识别粘贴或拖入的图片里的文字。
+    @Published private(set) var isRecognizing = false
     @Published private(set) var errorMessage: String?
     /// 取词相关的提示，例如"没有取到选中的文字"。
     @Published private(set) var notice: String?
@@ -45,6 +47,7 @@ final class TranslatorModel: ObservableObject {
     /// 当前请求是否已收到服务端的任何数据（含思考过程）。
     private var receivedAny = false
     private var loadingProgrammatically = false
+    private var recognizeID = 0
     /// 最近一次发出（或已完成）的请求，避免同样的内容重复请求。
     private var lastRequestKey: String?
 
@@ -63,12 +66,42 @@ final class TranslatorModel: ObservableObject {
         translateNow()
     }
 
+    /// 粘贴或拖入截图：在本机识别出文字，填进左栏并翻译。
+    func recognizeImages(_ images: [CGImage]) {
+        guard !images.isEmpty else { return }
+        recognizeID += 1
+        let id = recognizeID
+        isRecognizing = true
+        notice = nil
+        Task { [weak self] in
+            do {
+                let text = try await ImageText.recognize(images)
+                guard let self, self.recognizeID == id else { return }
+                self.isRecognizing = false
+                self.load(text)
+                self.notice = "已识别图片文字，多余的可在左栏删掉"
+            } catch {
+                guard let self, self.recognizeID == id else { return }
+                self.isRecognizing = false
+                self.showNotice(ImageText.describe(error))
+            }
+        }
+    }
+
     func showNotice(_ message: String) {
         notice = message
     }
 
     func clear() {
+        cancelRecognition()
         source = ""
+    }
+
+    /// 识别还没完成时你清空、改字或用快捷键取了新词：旧的识别结果回来后不再覆盖左栏。
+    func cancelRecognition() {
+        guard isRecognizing else { return }
+        recognizeID += 1
+        isRecognizing = false
     }
 
     func copyTarget() {
@@ -230,6 +263,7 @@ final class TranslatorModel: ObservableObject {
     private func sourceDidChange() {
         notice = nil
         guard !loadingProgrammatically else { return }
+        cancelRecognition()
         debounceTask?.cancel()
         if source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reset()

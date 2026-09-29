@@ -151,6 +151,7 @@ struct TranslatorPanes: View {
     @AppStorage(Keys.fontCJK) private var fontCJK = ""
     @AppStorage(Keys.fontSize) private var fontSize = Defaults.fontSize
     @State private var copied = false
+    @State private var composing = false
 
     var body: some View {
         let font = AppFont.font(latin: fontLatin, cjk: fontCJK, size: fontSize)
@@ -174,19 +175,23 @@ struct TranslatorPanes: View {
 
     private func sourcePane(_ font: Font) -> some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $model.source)
-                .font(font)
-                .lineSpacing(lineSpacing)
-                .foregroundStyle(theme.text)
-                .scrollContentBackground(.hidden)
-                .scrollIndicators(.never) // 接鼠标时系统会常显滚动条轨道，看着像一条空栏
-                .padding(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 34))
+            SourceTextView(
+                text: $model.source,
+                font: AppFont.nsFont(latin: fontLatin, cjk: fontCJK, size: CGFloat(fontSize)),
+                textColor: NSColor(theme.text),
+                lineSpacing: lineSpacing,
+                onImages: { model.recognizeImages($0) },
+                onComposingChange: { composing = $0 }
+            )
+            .padding(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 34))
 
-            if model.source.isEmpty {
+            if model.source.isEmpty && !composing {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("输入或粘贴文本进行翻译")
                         .font(.system(size: fontSize + 5, weight: .light))
                     Text("或选中任意文字，按 \(HotkeyManager.displayName(mode: hotkeyMode, customDisplay: customDisplay)) 快速翻译")
+                        .font(.system(size: 13))
+                    Text("也可以粘贴截图（⌘V）或把图片拖进来，自动识别其中的文字")
                         .font(.system(size: 13))
                 }
                 .foregroundStyle(theme.secondaryText.opacity(0.85))
@@ -230,7 +235,10 @@ struct TranslatorPanes: View {
 
     @ViewBuilder
     private var targetContent: some View {
-        if let error = model.errorMessage {
+        if model.isRecognizing {
+            Text("正在识别图片中的文字…")
+                .foregroundStyle(theme.secondaryText)
+        } else if let error = model.errorMessage {
             Text(error)
                 .foregroundStyle(theme.error)
                 .textSelection(.enabled)
@@ -246,7 +254,7 @@ struct TranslatorPanes: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            if model.isTranslating {
+            if model.isTranslating || model.isRecognizing {
                 ProgressView().controlSize(.small)
             }
             if model.directionChoice == .auto, let direction = model.activeDirection {
@@ -269,6 +277,7 @@ struct TranslatorPanes: View {
                     .font(.caption)
                     .foregroundStyle(theme.notice)
                     .lineLimit(2)
+                    .help(notice)
             }
             Spacer()
             Button {
