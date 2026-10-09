@@ -31,6 +31,13 @@ struct APIConfig {
     }
 }
 
+extension APIConfig {
+    /// 同一套接口设置，换一条系统提示词（查词用）。
+    func replacingPrompt(_ prompt: String) -> APIConfig {
+        APIConfig(endpoint: endpoint, apiKey: apiKey, model: model, disableThinking: disableThinking, systemPrompt: prompt)
+    }
+}
+
 enum TranslationError: LocalizedError {
     case missingKey
     case badURL(String)

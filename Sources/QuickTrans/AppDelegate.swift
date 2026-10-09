@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
     private var settingsWindow: NSWindow?
     private var appliedDarkAppearance: Bool?
     private var imagePasteMonitor: Any?
+    private var lookupEscapeMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NetworkMonitor.shared.start()
@@ -33,6 +34,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate {
             if !event.isARepeat {
                 self.model.recognizeImages(ImageText.images(from: .general))
             }
+            return nil
+        }
+        // 查词面板开着时，Esc 关掉它（正在用输入法组字时 Esc 留给输入法）。
+        lookupEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, let window = self?.mainWindow, event.window === window,
+                  WordLookup.shared.isVisible,
+                  (window.firstResponder as? NSTextView)?.hasMarkedText() != true else { return event }
+            WordLookup.shared.close()
             return nil
         }
         HotkeyManager.shared.onTrigger = { [weak self] result in

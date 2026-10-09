@@ -120,6 +120,7 @@ enum Keys {
     static let fontCJK = "fontCJK"
     static let fontSize = "fontSize"
     static let engineMode = "engineMode"
+    static let splitRatio = "splitRatio"
 
     static func prompt(_ direction: Direction, _ style: Style) -> String {
         "prompt.\(direction.rawValue).\(style.rawValue)"
@@ -147,6 +148,7 @@ enum Defaults {
             Keys.fontCJK: "",
             Keys.fontSize: fontSize,
             Keys.engineMode: EngineMode.auto.rawValue,
+            Keys.splitRatio: 0.5,
         ]
         for direction in Direction.allCases {
             for style in Style.allCases {
